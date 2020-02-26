@@ -39,3 +39,5 @@ cleaned_data <- raw_data %>%
 
 ### MERGING RARE FACTOR LEVELS INTO 'OTHER' ############################################################################
 
+df_status(cleaned_data)
+
