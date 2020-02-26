@@ -15,18 +15,27 @@ raw_data <- read_feather('data/000_ceidg_data.feather')
 
 df_status(raw_data)
 
-
 cleaned_data <- raw_data %>% 
-  head(100) %>%
+  sample_n(40000) %>%
   mutate_at(c('MainAddressCounty',
               'MainAddressVoivodeship',
               'CorrespondenceAddressCounty',
               'CorrespondenceAddressVoivodeship'), toupper) %>%
+  mutate_at(c('PKDMainSection',
+              'PKDMainDivision',
+              'PKDMainGroup',
+              'PKDMainClass'
+              ), replace_na, 'Empty field') %>%
+  mutate_if(is.character, as.factor) %>%
   select(-index,
          -NIP,
          -RandomDate,
-         -Citizenship,
-         -DateOfTerminationOrSuspension) %>%
-  mutate_if(is.character, as.factor) 
+         -DateOfTerminationOrSuspension,
+         -IsFax,
+         -RandomDate,
+         -MonthOfRandomDate,
+         -QuarterOfRandomDate)
+  
 
+### MERGING RARE FACTOR LEVELS INTO 'OTHER' ############################################################################
 
