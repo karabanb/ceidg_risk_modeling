@@ -4,7 +4,6 @@
 library(feather)
 library(tidyverse)
 library(funModeling)
-library(DataExplorer)
 
 ### LOADNING DATA ######################################################################################################
 
@@ -16,7 +15,6 @@ raw_data <- read_feather('data/000_ceidg_data.feather')
 df_status(raw_data)
 
 cleaned_data <- raw_data %>% 
-  sample_n(40000) %>%
   mutate_at(c('MainAddressCounty',
               'MainAddressVoivodeship',
               'CorrespondenceAddressCounty',
@@ -34,10 +32,11 @@ cleaned_data <- raw_data %>%
          -IsFax,
          -RandomDate,
          -MonthOfRandomDate,
-         -QuarterOfRandomDate)
+         -QuarterOfRandomDate,
+         -Citizenship)
   
 
 ### MERGING RARE FACTOR LEVELS INTO 'OTHER' ############################################################################
 
-df_status(cleaned_data)
+
 
