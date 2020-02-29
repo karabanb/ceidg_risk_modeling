@@ -35,8 +35,7 @@ cleaned_data <- raw_data %>%
          -QuarterOfRandomDate,
          -Citizenship)
   
-
+rm(raw_data)
 ### MERGING RARE FACTOR LEVELS INTO 'OTHER' ############################################################################
-
 
 
