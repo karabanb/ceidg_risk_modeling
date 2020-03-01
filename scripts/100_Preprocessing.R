@@ -5,6 +5,7 @@ library(feather)
 library(tidyverse)
 library(funModeling)
 
+
 ### LOADNING DATA ######################################################################################################
 
 raw_data <- read_feather('data/000_ceidg_data.feather')
@@ -36,6 +37,8 @@ cleaned_data <- raw_data %>%
          -Citizenship)
   
 rm(raw_data)
-### MERGING RARE FACTOR LEVELS INTO 'OTHER' ############################################################################
+
+### MERGING FACTOR's LEVELS BY CLUSTERING  #############################################################################
+
 
 
