@@ -1,231 +1,537 @@
 
-library(h2o)
+library(DataExplorer)
+library(car)
+library(dummies)
+library(scorecard)
 
-# write.csv(cleaned_data, 'data/100_CleanedData.csv', row.names = FALSE)
-# 
-# h2o.init()
-# 
-# cleaned_data <- h2o.importFile('data/100_CleanedData.csv')
-# 
-# h2o.describe(cleaned_data)
-# 
-# to_factors <- c('PKDMainDivision', 'PKDMainGroup', 'PKDMainClass', 'QuarterOfStartingOfTheBusiness')
-# cleaned_data[, to_factors] <- as.factor(cleaned_data[ , to_factors])
-# 
-# df_split <- h2o.splitFrame(cleaned_data, ratios = 0.8, seed = 42)
-# 
-# train <- df_split[[1]]
-# test <- df_split[[2]]
-# 
-# target = 'Target'
-# 
-# aml <- h2o.automl(y = target,
-#                   training_frame = train,
-#                   validation_frame = test,
-#                   max_runtime_secs = 60, 
-#                   seed = 42)
+cleaned_data_lump <- cleaned_data %>%
+  mutate('PKDMainSection' = fct_lump_prop(PKDMainSection, prop = 0.01),
+         'PKDMainDivision' = fct_lump_prop(PKDMainDivision, prop = 0.01),
+         'PKDMainGroup' = fct_lump_prop(PKDMainGroup, prop = 0.01),
+         'PKDMainClass' = fct_lump_prop(PKDMainClass, prop = 0.01),
+         'MainAddressVoivodeship' = fct_lump(MainAddressVoivodeship, n = 16),
+         'CorrespondenceAddressVoivodeship' = fct_lump(CorrespondenceAddressVoivodeship, n = 16))
 
+### Different levels of modularity of the data -------------------------------------------------------------------------
 
-vr1 = var_rank_info(cleaned_data, 'Target')
+sample_size = 100000
 
-### Auto grouping ------------------------------------------------------------------------------------------------------
-
-df_status(cleaned_data)
-
-
-MainAddressVoivodeship = auto_grouping(cleaned_data,
-                                       input = 'MainAddressVoivodeship',
-                                       target = 'Target',
-                                       n_groups = 14,
-                                       model = 'hclust',
-                                       seed = 42)
-
-categ_analysis(cleaned_data, 'MainAddressVoivodeship', 'Target')
-MainAddressVoivodeship$recateg_results
-
-CorrespondenceAddressVoivodeship = auto_grouping(cleaned_data,
-                                                 input = 'CorrespondenceAddressVoivodeship',
-                                                 target = 'Target',
-                                                 n_groups = 15,
-                                                 model = 'hclust',
-                                                 seed = 42)
-
-categ_analysis(cleaned_data, 'CorrespondenceAddressVoivodeship', 'Target')
-CorrespondenceAddressVoivodeship$recateg_results
-
-PKDMainSection = auto_grouping(cleaned_data,
-                               input = 'PKDMainSection',
-                               target = 'Target',
-                               n_groups = 12,
-                               seed = 42)
-
-
-
-PKDMainDivision = auto_grouping(cleaned_data,
-                             input = 'PKDMainDivision',
-                             target = 'Target',
-                             model = 'hclust',
-                             n_groups = 15,
-                             seed = 42)
-
-PKDMainGroup = auto_grouping(cleaned_data,
-                            input = 'PKDMainGroup',
-                            target = 'Target',
-                            n_groups = 25,
-                            model = 'hclust',
-                            seed = 42)
-
-PKDMainClass = auto_grouping(cleaned_data,
-                             input = 'PKDMainClass',
-                             target = 'Target',
-                             model = 'hclust',
-                             n_groups = 35,
-                             seed = 42)
-
-PKDMainClass$recateg_results
-CorrespondenceAddressCounty = auto_grouping(cleaned_data,
-                             input = 'CorrespondenceAddressCounty',
-                             target = 'Target',
-                             n_groups = 18,
-                             seed = 42)
-
-# categ_analysis(cleaned_data, 'CorrespondenceAddressCounty', 'Target')
-
-
-cleaned_data_tmp <- cleaned_data %>%
-  inner_join(MainAddressVoivodeship$df_equivalence) %>%
-  inner_join(CorrespondenceAddressVoivodeship$df_equivalence) %>%
-  inner_join(PKDMainSection$df_equivalence) %>%
-  inner_join(PKDMainDivision$df_equivalence) %>%
-  inner_join(PKDMainGroup$df_equivalence) %>%
-  inner_join(CorrespondenceAddressCounty$df_equivalence) %>%
-  inner_join(PKDMainClass$df_equivalence) %>%
-  select(-MainAddressCounty,
-         -MainAddressVoivodeship,
-         -CorrespondenceAddressCounty,
-         -CorrespondenceAddressVoivodeship,
-         -PKDMainSection,
-         -PKDMainClass,
+set.seed(42)
+dummy_PKDSection <- cleaned_data_lump %>%
+  sample_n(sample_size) %>% 
+  select(-PKDMainDivision,
          -PKDMainGroup,
-         -PKDMainDivision,
+         -PKDMainClass,
+         -CorrespondenceAddressVoivodeship,
+         -MainAddressVoivodeship,
+         -MonthOfStartingOfTheBusiness,
+         -QuarterOfStartingOfTheBusiness,
+         -NoOfLicences,
+         -NoOfUniquePKDGroups,
+         -NoOfUniquePKDDivsions,
          -NoOfUniquePKDClasses,
-         -NoOfUniquePKDGroups
-         # -NoOfUniquePKDDivisions
-         ) %>% 
-  mutate_if(is.character, as.factor) %>%
-  mutate(QuarterOfStartingOfTheBusiness = as.factor(QuarterOfStartingOfTheBusiness))
+         -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'))
 
-save(cleaned_data_tmp, file = 'tmp/Sketchbook_cleaned.RData')
 
-sampled_cleaned_df <- cleaned_data_tmp %>% 
-  sample_n(1000000)
+set.seed(42)
+dummy_PKDDivision <- cleaned_data_lump %>%
+  sample_n(sample_size) %>% 
+  select(-PKDMainSection,
+         -PKDMainGroup,
+         -PKDMainClass,
+         -CorrespondenceAddressVoivodeship,
+         -MainAddressVoivodeship,
+         -MonthOfStartingOfTheBusiness,
+         -QuarterOfStartingOfTheBusiness,
+         -NoOfLicences,
+         -NoOfUniquePKDGroups,
+         -NoOfUniquePKDDivsions,
+         -NoOfUniquePKDClasses,
+         -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'))
+
+
+set.seed(42)
+dummy_PKDGroup <- cleaned_data_lump %>%
+  sample_n(sample_size) %>% 
+  select(
+         -PKDMainSection,
+         -PKDMainDivision,
+         -PKDMainClass,
+         -CorrespondenceAddressVoivodeship,
+         -MainAddressVoivodeship,
+         -MonthOfStartingOfTheBusiness,
+         -QuarterOfStartingOfTheBusiness,
+         -NoOfLicences,
+         -NoOfUniquePKDGroups,
+         -NoOfUniquePKDDivsions,
+         -NoOfUniquePKDClasses,
+         -NoOfCitizenships) %>%
+  mutate(NoOfAdditionalPlaceOfTheBusiness = sqrt(NoOfAdditionalPlaceOfTheBusiness)) %>% 
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'))
+
+
+set.seed(42)
+dummy_PKDClass <- cleaned_data_lump %>%
+  sample_n(sample_size) %>% 
+  select(
+    -PKDMainSection,
+    -PKDMainDivision,
+    -PKDMainGroup,
+    -CorrespondenceAddressVoivodeship,
+    -MainAddressVoivodeship,
+    -MonthOfStartingOfTheBusiness,
+    -QuarterOfStartingOfTheBusiness,
+    -NoOfLicences,
+    -NoOfUniquePKDGroups,
+    -NoOfUniquePKDDivsions,
+    -NoOfUniquePKDClasses,
+    -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'))
+
+rm(cleaned_data_lump, cleaned_data)
+
+set.seed(42)
+dummy_PKDSectionGrouped <- cleaned_data_PKDSectionGrouped %>%
+  sample_n(sample_size) %>% 
+  select(
+    -PKDMainSection,
+    -PKDMainDivision,
+    -PKDMainGroup,
+    -PKDMainClass,
+    -CorrespondenceAddressVoivodeship,
+    -MainAddressVoivodeship,
+    -MonthOfStartingOfTheBusiness,
+    -QuarterOfStartingOfTheBusiness,
+    -NoOfLicences,
+    -NoOfUniquePKDGroups,
+    -NoOfUniquePKDDivsions,
+    -NoOfUniquePKDClasses,
+    -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'),
+         -PKDMainSection_rec_group_5
+         )
+
+rm(cleaned_data_PKDSectionGrouped)
+
+
+set.seed(42)
+dummy_PKDDivisionGrouped <- cleaned_data_PKDDivisionGrouped %>%
+  sample_n(sample_size) %>% 
+  select(
+    -PKDMainSection,
+    -PKDMainDivision,
+    -PKDMainGroup,
+    -PKDMainClass,
+    -CorrespondenceAddressVoivodeship,
+    -MainAddressVoivodeship,
+    -MonthOfStartingOfTheBusiness,
+    -QuarterOfStartingOfTheBusiness,
+    -NoOfLicences,
+    -NoOfUniquePKDGroups,
+    -NoOfUniquePKDDivsions,
+    -NoOfUniquePKDClasses,
+    -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE'),
+         -PKDMainDivision_rec_group_8
+  )
+
+rm(cleaned_data_PKDDivisionGrouped)
+
+set.seed(42)
+dummy_PKDGroupGrouped <- cleaned_data_PKDGroupGrouped %>%
+  sample_n(sample_size) %>% 
+  select(
+    -PKDMainSection,
+    -PKDMainDivision,
+    -PKDMainGroup,
+    -PKDMainClass,
+    -CorrespondenceAddressVoivodeship,
+    -MainAddressVoivodeship,
+    -MonthOfStartingOfTheBusiness,
+    -QuarterOfStartingOfTheBusiness,
+    -NoOfLicences,
+    -NoOfUniquePKDGroups,
+    -NoOfUniquePKDDivsions,
+    -NoOfUniquePKDClasses,
+    -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE')) 
   
 
-write.csv(sampled_cleaned_df, 'data/Sketchbook_CleanedData.csv', row.names = FALSE)
+rm(cleaned_data_PKDGroupGrouped)
 
-h2o.init()
+set.seed(42)
+dummy_Grouped <- cleaned_data_Grouped %>%
+  sample_n(sample_size) %>% 
+  select(
+    -PKDMainSection,
+    -PKDMainDivision,
+    -PKDMainGroup,
+    -PKDMainClass,
+    -CorrespondenceAddressVoivodeship,
+    -MainAddressVoivodeship,
+    -MainAddressCounty,
+    -MonthOfStartingOfTheBusiness,
+    -QuarterOfStartingOfTheBusiness,
+    -NoOfLicences,
+    -NoOfUniquePKDGroups,
+    -NoOfUniquePKDDivsions,
+    -NoOfUniquePKDClasses,
+    -NoOfCitizenships) %>%
+  dummify(maxcat = 100, select = setdiff(colnames(.), 'Target')) %>% 
+  select(-ends_with('FALSE')
+  )
 
-cleaned_data <- h2o.importFile('data/Sketchbook_CleanedData.csv')
+rm(cleaned_data_Grouped)
 
-h2o.describe(cleaned_data)
+set.seed(42)
+ix_train <- sample(1:sample_size, 0.7 * sample_size)
+weights <- if_else(dummy_PKDSection$Target == 1, 4, 1) 
 
-to_factors <- 'QuarterOfStartingOfTheBusiness'
-cleaned_data[, to_factors] <- as.factor(cleaned_data[ , to_factors])
+### GLM witg different datasets ########################################################################################
 
-df_split <- h2o.splitFrame(cleaned_data, ratios = 0.8, seed = 42)
+### GLM PKDMainSection -------------------------------------------------------------------------------------------------
 
-train <- df_split[[1]]
-test <- df_split[[2]]
-
-target = 'Target'
-
-aml <- h2o.automl(y = target,
-                  training_frame = train,
-                  leaderboard_frame = test,
-                  balance_classes = TRUE,
-                  include_algos = c('GBM', 'XGboost', 'GLM'),
-                  keep_cross_validation_predictions = TRUE,
-                  keep_cross_validation_models = TRUE,
-                  max_runtime_secs = 600, 
-                  stopping_metric = 'AUC',
-                  seed = 42)
+m1_glm <- glm(Target~., 
+              data = dummy_PKDSection[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train])
 
 
-alb = aml@leaderboard
+m1_glm_bic <- step(m1_glm, direction = 'both', k = log(sample_size * 0.7))
+vif(m1_glm_bic)
 
-m = h2o.getModel(alb[1, 'model_id'])
+pred_m1_bic_trn <- predict(m1_glm_bic, newdata = dummy_PKDSection[ix_train,], type='response')
+pred_m1_bic_tst <- predict(m1_glm_bic, newdata = dummy_PKDSection[-ix_train,], type='response')
 
-h2o.varimp(m)
-vr1 = cleaned_data_tmp  %>% var_rank_info('Target')
+MLmetrics::AUC(pred_m1_bic_trn, dummy_PKDSection$Target[ix_train])
+MLmetrics::AUC(pred_m1_bic_tst, dummy_PKDSection$Target[-ix_train])
 
-#### BASE GLM ##########################################################################################################
+m1_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainSection_A + PKDMainSection_C + PKDMainSection_R +
+                  PKDMainSection_G + PKDMainSection_H + PKDMainSection_I + 
+                  PKDMainSection_J + PKDMainSection_N + PKDMainSection_Q,
+                data = dummy_PKDSection[ix_train,],
+                family = 'binomial',
+                weights = weights[ix_train])
 
 
+pred_m1_r_trn <- predict(m1_glm_r, newdata = dummy_PKDSection[ix_train,], type='response')
+pred_m1_r_tst <- predict(m1_glm_r, newdata = dummy_PKDSection[-ix_train,], type='response')
 
-set.seed(242)
+MLmetrics::AUC(pred_m1_r_trn, dummy_PKDSection$Target[ix_train]) #AUC 67.3 [100k]
+MLmetrics::AUC(pred_m1_r_tst, dummy_PKDSection$Target[-ix_train]) #AUC 67.5 [100k]
 
-n <- nrow(sampled_cleaned_df)
-ix_train <- sample(1: n, 0.7 * n)
+### GLM PKDMainDivision ------------------------------------------------------------------------------------------------
 
-sampled_cleaned_df$Target <- as.integer(sampled_cleaned_df$Target)
+m2_glm <- glm(Target~., 
+              data = dummy_PKDDivision[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train])
 
-sampled_cleaned_df <- sampled_cleaned_df %>%
-  select(-MonthOfStartingOfTheBusiness,
-         -QuarterOfStartingOfTheBusiness,
-         -PKDMainClass_rec)
 
-?fct_drop()
+m2_glm_bic <- step(m2_glm, direction = 'both', k = log(sample_size * 0.7))
+vif(m2_glm_bic)
 
-m_glm <- glm(Target~ . -1,
-             family = 'binomial', data = sampled_cleaned_df[ix_train, ])
+pred_m2_bic_trn <- predict(m2_glm_bic, newdata = dummy_PKDDivision[ix_train,], type='response')
+pred_m2_bic_tst <- predict(m2_glm_bic, newdata = dummy_PKDDivision[-ix_train,], type='response')
 
-m_glm <- step(m_glm, direction = 'backward')
+MLmetrics::AUC(pred_m2_bic_trn, dummy_PKDDivision$Target[ix_train]) # AUC 68.4 [100k]
+MLmetrics::AUC(pred_m2_bic_tst, dummy_PKDDivision$Target[-ix_train]) #AUC 68.3 [100k]
 
-vif(m_glm)
+m2_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainDivision_33 + PKDMainDivision_45 + PKDMainDivision_47 + 
+                  PKDMainDivision_49 + PKDMainDivision_56 + PKDMainDivision_62 + 
+                  PKDMainDivision_66 + PKDMainDivision_68 + PKDMainDivision_69 + 
+                  PKDMainDivision_70 + PKDMainDivision_71 + PKDMainDivision_73 + 
+                  PKDMainDivision_74 + PKDMainDivision_85 + PKDMainDivision_86 + 
+                  PKDMainDivision_96,
+                data = dummy_PKDDivision[ix_train,],
+                weights = weights[ix_train])
 
-m1_pred_trn <- predict(m_glm, newdata = cleaned_data_tmp[ix_train,], type = 'response')
-m1_pred_tst <- predict(m_glm, newdata = cleaned_data_tmp[-ix_train,], type = 'response')
+pred_m2_r_trn <- predict(m2_glm_r, newdata = dummy_PKDDivision[ix_train,], type='response')
+pred_m2_r_tst <- predict(m2_glm_r, newdata = dummy_PKDDivision[-ix_train,], type='response')
 
-MLmetrics::AUC(m1_pred_trn, cleaned_data_tmp[ix_train, 'Target'])
-MLmetrics::AUC(m1_pred_tst, sampled_cleaned_df[-ix_train, 'Target'])
+MLmetrics::AUC(pred_m2_r_trn, dummy_PKDDivision$Target[ix_train]) # AUC 68.3 [100k]
+MLmetrics::AUC(pred_m2_r_tst, dummy_PKDDivision$Target[-ix_train]) #AUC 68.2 [100k]
 
-sampled_dummies <- dummify(data = sampled_cleaned_df, maxcat = 60)
+### GLM PKDMainGroup ---------------------------------------------------------------------------------------------------
 
-sampled_dummies_model <- sampled_dummies %>% 
-  select(MainAndCorrespondenceAreTheSame_FALSE,
-        # MainAndCorrespondenceAreTheSame_TRUE,
-         NoOfAdditionalPlaceOfTheBusiness,
-         CommunityProperty_nie,
-         HasLicences_TRUE,
-         Sex_M,
-         ShareholderInOtherCompanies_TRUE,
-         NoOfUniquePKDSections,
-         NoOfPastBusinesses,
-         DurationOfExistenceInMonths,
-         PKDMainGroup_rec_group_10,
-         PKDMainGroup_rec_group_23,
-         PKDMainGroup_rec_group_35,
-         PKDMainGroup_rec_group_36,
-         CorrespondenceAddressCounty_rec_group_19,
-         CorrespondenceAddressCounty_rec_group_3,
-         PKDMainClass_rec_group_30,
-         PKDMainClass_rec_group_33,
-         PKDMainClass_rec_group_43,
-         PKDMainClass_rec_group_47,
-         PKDMainClass_rec_group_48,
-         PKDMainClass_rec_group_5,
-         PKDMainClass_rec_group_52,
-         PKDMainClass_rec_group_54,
-         Target
-         ) %>% as.data.frame()
+m3_glm <- glm(Target~., 
+             data = dummy_PKDGroup[ix_train,],
+             family = 'binomial',
+             weights = weights[ix_train])
 
-m2_glm <- glm(Target~.-1, data = sampled_dummies_model, family = 'binomial')
-m2_glm_step <- step(m2_glm,direction = 'backward')
+m3_glm_bic <- step(m3_glm, direction = 'both', k = log(sample_size * 0.7))
+vif(m3_glm_bic)
 
-vif(m2_glm_step)
+summary(m3_glm_bic)
 
-m2_pred_trn <- predict(m2_glm, newdata = sampled_dummies_model[ix_train,], type = 'response')
-m2_pred_tst <- predict(m2_glm, newdata = sampled_dummies_model[-ix_train,], type = 'response')
+pred_m3_bic_trn <- predict(m3_glm_bic, newdata = dummy_PKDGroup[ix_train,], type='response')
+pred_m3_bic_tst <- predict(m3_glm_bic, newdata = dummy_PKDGroup[-ix_train,], type='response')
 
-Metrics::auc(sampled_dummies_model[ix_train, 'Target'], m2_pred_trn)
-Metrics::auc(sampled_dummies_model[-ix_train, 'Target'], m2_pred_tst)
+MLmetrics::AUC(pred_m3_bic_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.6 [100k]
+MLmetrics::AUC(pred_m3_bic_tst, dummy_PKDGroup$Target[-ix_train]) # AUC 68.6 [100k]
+
+m3_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainGroup_331 + PKDMainGroup_432 + PKDMainGroup_452 + 
+                  PKDMainGroup_471 + PKDMainGroup_477 + PKDMainGroup_478 + 
+                  PKDMainGroup_479 + PKDMainGroup_493 + PKDMainGroup_494 + 
+                  PKDMainGroup_561 + PKDMainGroup_620 + PKDMainGroup_662 + 
+                  PKDMainGroup_691 + PKDMainGroup_692 + 
+                  PKDMainGroup_711 + PKDMainGroup_731 + 
+                  PKDMainGroup_862 + PKDMainGroup_869 + PKDMainGroup_960,
+                data = dummy_PKDGroup[ix_train,],
+                family = 'binomial',
+                weights = weights[ix_train])
+
+summary(m3_glm_r)
+
+pred_m3_r_trn <- predict(m3_glm_r, newdata = dummy_PKDGroup[ix_train,], type='response')
+pred_m3_r_tst <- predict(m3_glm_r, newdata = dummy_PKDGroup[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m3_r_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.5 [100k]
+MLmetrics::AUC(pred_m3_r_tst, dummy_PKDGroup$Target[-ix_train]) # AUC 68.6 [100k]
+
+
+# --  5 fold CV ----
+
+cv_m3_r <- perf_cv(dummy_PKDGroup,
+                   x = setdiff(names(m3_glm_r$coefficients), c('Target', '(Intercept)')),
+                   y = 'Target',
+                   no_folds = 10,
+                   binomial_metric = 'auc')
+
+### GLM PKDMainClass ---------------------------------------------------------------------------------------------------
+
+m4_glm <- glm(Target~., 
+              data = dummy_PKDClass[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train])
+
+m4_glm_bic <- step(m4_glm, direction = 'both', k = log(sample_size * 0.7))
+vif(m4_glm_bic)
+
+summary(m4_glm_bic)
+
+pred_m4_bic_trn <- predict(m4_glm_bic, newdata = dummy_PKDClass[ix_train,], type='response')
+pred_m4_bic_tst <- predict(m4_glm_bic, newdata = dummy_PKDClass[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m4_bic_trn, dummy_PKDClass$Target[ix_train]) # AUC 68.2 [100k]
+MLmetrics::AUC(pred_m4_bic_tst, dummy_PKDClass$Target[-ix_train]) # AUC 68.3 [100k]
+
+
+m4_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainClass_4322 + PKDMainClass_4339 + 
+                  PKDMainClass_4520 + PKDMainClass_4711 + PKDMainClass_4771 + 
+                  PKDMainClass_4782 + PKDMainClass_4791 + PKDMainClass_4932 + 
+                  PKDMainClass_4941 + PKDMainClass_5610 + PKDMainClass_6201 + 
+                  PKDMainClass_6622 + PKDMainClass_6910 + PKDMainClass_6920 + 
+                  PKDMainClass_7112 + PKDMainClass_7311 + 
+                  PKDMainClass_8621 + PKDMainClass_8622 + PKDMainClass_8690 + 
+                  PKDMainClass_9602,
+                data = dummy_PKDClass[ix_train,],
+                weights = weights[ix_train])
+vif(m4_glm_r)
+
+pred_m4_r_trn <- predict(m4_glm_r, newdata = dummy_PKDClass[ix_train,], type='response')
+pred_m4_r_tst <- predict(m4_glm_r, newdata = dummy_PKDClass[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m4_r_trn, dummy_PKDClass$Target[ix_train]) # AUC 68 [100k]
+MLmetrics::AUC(pred_m4_r_tst, dummy_PKDClass$Target[-ix_train]) # AUC 68.2 [100k]
+
+
+### GLM PKDMainSectionGrouped ------------------------------------------------------------------------------------------
+
+m5_glm <- glm(Target~., 
+              data = dummy_PKDSectionGrouped[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train],)
+
+m5_glm_bic <- step(m5_glm, direction = 'both',
+                   k = log(sample_size * 0.7)
+                   )
+vif(m5_glm_bic)
+
+summary(m5_glm_bic)
+
+pred_m5_bic_trn <- predict(m5_glm_bic, newdata = dummy_PKDSectionGrouped[ix_train,], type='response')
+pred_m5_bic_tst <- predict(m5_glm_bic, newdata = dummy_PKDSectionGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m5_bic_trn, dummy_PKDSectionGrouped$Target[ix_train])  # AUC 67 [100k]
+MLmetrics::AUC(pred_m5_bic_tst, dummy_PKDSectionGrouped$Target[-ix_train]) # AUC 66.7 [100k]
+
+m5_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainSection_rec_group_1 + PKDMainSection_rec_group_2 + 
+                  PKDMainSection_rec_group_3 + PKDMainSection_rec_group_6 + 
+                  PKDMainSection_rec_group_7,
+                data = dummy_PKDSectionGrouped[ix_train,],
+                weights = weights[ix_train])
+
+vif(m5_glm_r)
+summary(m5_glm_r)
+
+pred_m5_r_trn <- predict(m5_glm_r, newdata = dummy_PKDSectionGrouped[ix_train,], type='response')
+pred_m5_r_tst <- predict(m5_glm_r, newdata = dummy_PKDSectionGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m5_r_trn, dummy_PKDClass$Target[ix_train])  # AUC 66.8 [100k]
+MLmetrics::AUC(pred_m5_r_tst, dummy_PKDClass$Target[-ix_train]) # AUC 66.7 [100k]
+
+
+### GLM PKDMainDivisionGrouped -----------------------------------------------------------------------------------------
+
+m6_glm <- glm(Target~., 
+              data = dummy_PKDDivisionGrouped[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train],)
+
+m6_glm_bic <- step(m6_glm, direction = 'both',
+                   k = log(sample_size * 0.7)
+)
+
+summary(m6_glm_bic)
+vif(m6_glm_bic)
+
+pred_m6_bic_trn <- predict(m6_glm_bic, newdata = dummy_PKDDivisionGrouped[ix_train,], type='response')
+pred_m6_bic_tst <- predict(m6_glm_bic, newdata = dummy_PKDDivisionGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m6_bic_trn, dummy_PKDDivisionGrouped$Target[ix_train]) # AUC 68.1 [100k]
+MLmetrics::AUC(pred_m6_bic_tst, dummy_PKDDivisionGrouped$Target[-ix_train]) # AUC 68.2 [100k]
+
+m6_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                CommunityProperty_nie + HasLicences_TRUE + 
+                Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                PKDMainDivision_rec_group_1 + PKDMainDivision_rec_group_11 + 
+                PKDMainDivision_rec_group_12 + PKDMainDivision_rec_group_13 + 
+                PKDMainDivision_rec_group_14 + PKDMainDivision_rec_group_4 + 
+                PKDMainDivision_rec_group_6 + PKDMainDivision_rec_group_9, 
+              data = dummy_PKDDivisionGrouped[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train],)
+
+vif(m6_glm_r)
+summary(m6_glm_r)
+
+pred_m6_r_trn <- predict(m6_glm_r, newdata = dummy_PKDDivisionGrouped[ix_train,], type='response')
+pred_m6_r_tst <- predict(m6_glm_r, newdata = dummy_PKDDivisionGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m6_r_trn, dummy_PKDDivisionGrouped$Target[ix_train]) # AUC 68.1 [100k]
+MLmetrics::AUC(pred_m6_r_tst, dummy_PKDDivisionGrouped$Target[-ix_train]) # AUC 68.2 [100k]
+
+### GLM PKDMainGrpupGrouped -----------------------------------------------------------------------------------------
+
+m7_glm <- glm(Target~., 
+              data = dummy_PKDGroupGrouped[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train],)
+
+m7_glm_bic <- step(m7_glm, direction = 'both',
+                   k = log(sample_size * 0.7)
+)
+
+summary(m7_glm_bic)
+vif(m7_glm_bic)
+
+pred_m7_bic_trn <- predict(m7_glm_bic, newdata = dummy_PKDGroupGrouped[ix_train,], type='response')
+pred_m7_bic_tst <- predict(m7_glm_bic, newdata = dummy_PKDGroupGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m7_bic_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.7 [100k]
+MLmetrics::AUC(pred_m7_bic_tst, dummy_PKDGroupGrouped$Target[-ix_train]) # AUC 68.7 [100k]
+
+m7_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  PKDMainGroup_rec_group_13 + PKDMainGroup_rec_group_14 + PKDMainGroup_rec_group_15 + 
+                  PKDMainGroup_rec_group_16 + PKDMainGroup_rec_group_18 + PKDMainGroup_rec_group_19 + 
+                  PKDMainGroup_rec_group_20 + PKDMainGroup_rec_group_21 + PKDMainGroup_rec_group_22 + 
+                  PKDMainGroup_rec_group_23 + PKDMainGroup_rec_group_24 + PKDMainGroup_rec_group_25 + 
+                  PKDMainGroup_rec_group_26 + PKDMainGroup_rec_group_27 + PKDMainGroup_rec_group_28 + 
+                  PKDMainGroup_rec_group_29 + PKDMainGroup_rec_group_3 + PKDMainGroup_rec_group_30,
+                data = dummy_PKDGroupGrouped[ix_train,],
+                family = 'binomial',
+                weights = weights[ix_train]
+)
+
+vif(m7_glm_r)
+summary(m7_glm_r)
+length(m7_glm_r$coefficients)
+
+pred_m7_r_trn <- predict(m7_glm_r, newdata = dummy_PKDGroupGrouped[ix_train,], type='response')
+pred_m7_r_tst <- predict(m7_glm_r, newdata = dummy_PKDGroupGrouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m7_r_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.6 [100k]
+MLmetrics::AUC(pred_m7_r_tst, dummy_PKDGroupGrouped$Target[-ix_train]) # AUC 68.5 [100k]
+
+
+### GLM Grouped PKD Groups And Counties---------------------------------------------------------------------------------
+
+m8_glm <- glm(Target~.,
+              data = dummy_Grouped[ix_train,],
+              family = 'binomial',
+              weights = weights[ix_train])
+
+m8_glm_bic <- step(m8_glm, direction = 'both',
+                   k = log(sample_size * 0.7)
+)
+
+summary(m8_glm_bic)
+vif(m8_glm_bic)
+
+pred_m8_bic_trn <- predict(m8_glm_bic, newdata = dummy_Grouped[ix_train,], type='response')
+pred_m8_bic_tst <- predict(m8_glm_bic, newdata = dummy_Grouped[-ix_train,], type='response')
+
+MLmetrics::AUC(pred_m8_bic_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.7 [100k]
+MLmetrics::AUC(pred_m8_bic_tst, dummy_PKDGroupGrouped$Target[-ix_train]) # AUC 68.7 [100k]
+
+
+m8_glm_r <- glm(Target ~ NoOfAdditionalPlaceOfTheBusiness + NoOfUniquePKDSections + 
+                  NoOfPastBusinesses + DurationOfExistenceInMonths + IsWWW_TRUE + 
+                  CommunityProperty_nie + HasLicences_TRUE + 
+                  Sex_F + HasPolishCitizenship_TRUE + ShareholderInOtherCompanies_TRUE + 
+                  # PKDMainGroup_rec_group_11 + PKDMainGroup_rec_group_12 + 
+                  PKDMainGroup_rec_group_13 + PKDMainGroup_rec_group_14 + PKDMainGroup_rec_group_15 + 
+                  PKDMainGroup_rec_group_16 + PKDMainGroup_rec_group_18 + PKDMainGroup_rec_group_19 + 
+                  PKDMainGroup_rec_group_20 + PKDMainGroup_rec_group_21 + PKDMainGroup_rec_group_22 + 
+                  PKDMainGroup_rec_group_23 + PKDMainGroup_rec_group_24 + PKDMainGroup_rec_group_25 + 
+                  PKDMainGroup_rec_group_26 + PKDMainGroup_rec_group_27 + PKDMainGroup_rec_group_28 + 
+                  PKDMainGroup_rec_group_29 + PKDMainGroup_rec_group_3 + PKDMainGroup_rec_group_30 + 
+                  # PKDMainGroup_rec_group_8 + 
+                  MainAddressCounty_rec_group_12,
+                data = dummy_Grouped[ix_train,],
+                family = 'binomial',
+                weights = weights[ix_train]
+  
+)
+
+summary(m8_glm_r)
+length(m8_glm_r$coefficients)
+
+pred_m8_r_trn <- predict(m8_glm_r, newdata = dummy_Grouped[ix_train,], type='response')
+pred_m8_r_tst <- predict(m8_glm_r, newdata = dummy_Grouped[-ix_train,], type='response')
+MLmetrics::AUC(pred_m8_r_trn, dummy_PKDGroup$Target[ix_train]) # AUC 68.6 [100k]
+MLmetrics::AUC(pred_m8_r_tst, dummy_PKDGroupGrouped$Target[-ix_train]) # AUC 68.6 [100k]
