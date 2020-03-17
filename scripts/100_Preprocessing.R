@@ -19,22 +19,44 @@ char_vars <- c('PKDMainSection', 'PKDMainDivision', 'PKDMainGroup', 'PKDMainClas
 
 set.seed(42)
 cleaned_data <- raw_data %>%
-  mutate(Target = as.integer(Target)) %>% 
+  # sample_n(1000) %>%
+  filter(NIP == '1130106921') %>% 
+  mutate(Target = as.integer(Target),
+         QuarterOfStartingOfTheBusiness = paste0('Q', QuarterOfStartingOfTheBusiness)) %>% 
   mutate_at(char_vars, toupper) %>%
   mutate_at(char_vars, na_if, '') %>%
   mutate_at(char_vars, replace_na, 'EmptyField') %>%
   mutate_if(is.character, as.factor) %>%
-  select(-index,
-         -NIP,
-         -RandomDate,
-         -DateOfTerminationOrSuspension,
-         -IsFax,
-         -RandomDate,
-         -MonthOfRandomDate,
-         -QuarterOfRandomDate,
-         -Citizenship,
-         # -MainAddressCounty,
-         -CorrespondenceAddressCounty)
+  select(NIP,
+         RandomDate,
+         MonthOfStartingOfTheBusiness,
+         QuarterOfStartingOfTheBusiness,
+         MainAddressVoivodeship,
+         MainAddressCounty,
+         CorrespondenceAddressVoivodeship,
+         CorrespondenceAddressCounty,
+         MainAndCorrespondenceAreTheSame,
+         DurationOfExistenceInMonths,
+         NoOfAdditionalPlaceOfTheBusiness,
+         IsPhoneNo,
+         IsEmail,
+         IsWWW,
+         CommunityProperty,
+         HasLicences,
+         NoOfLicences,
+         Sex,
+         HasPolishCitizenship,
+         ShareholderInOtherCompanies,
+         PKDMainSection,
+         PKDMainDivision,
+         PKDMainGroup,
+         PKDMainClass,
+         NoOfUniquePKDSections,
+         NoOfUniquePKDDivsions,
+         NoOfUniquePKDGroups,
+         NoOfUniquePKDClasses,
+         Target
+  )
   
 rm(raw_data, char_vars)
 
