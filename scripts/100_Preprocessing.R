@@ -19,8 +19,7 @@ char_vars <- c('PKDMainSection', 'PKDMainDivision', 'PKDMainGroup', 'PKDMainClas
 
 set.seed(42)
 cleaned_data <- raw_data %>%
-  # sample_n(1000) %>%
-  filter(NIP == '1130106921') %>% 
+  sample_n(1000) %>%
   mutate(Target = as.integer(Target),
          QuarterOfStartingOfTheBusiness = paste0('Q', QuarterOfStartingOfTheBusiness)) %>% 
   mutate_at(char_vars, toupper) %>%
@@ -58,6 +57,8 @@ cleaned_data <- raw_data %>%
          Target
   )
   
+write.csv(cleaned_data, file = 'results/100_CEIDG_sample.csv', fileEncoding = 'UTF-8', row.names = FALSE)
+
 rm(raw_data, char_vars)
 
 
